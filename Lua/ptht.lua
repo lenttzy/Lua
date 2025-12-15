@@ -6,7 +6,7 @@ delayht = 5
 yTop = 0
 yBottom = 112
 seedID = 5640
-platID = 7520
+platID = 8682
 mode = "Vertical"
 
 SCAN_X_MIN, SCAN_X_MAX = 0, 100
@@ -693,6 +693,45 @@ local function FastGetTile(x, y)
   return t or {}
 end
 
+-- New function: scan the world area (yTop..yBottom, x 0..200) to detect if platID exists
+-- Returns true if found, false otherwise
+local function IsPlatIDPresent()
+  -- If platID is invalid or nil treat as not present
+  if not platID or type(platID) ~= "number" or platID == 0 then
+    return false
+  end
+  local opCounter = 0
+  -- Try scanning within configured Y range first (faster)
+  for y = yTop, yBottom do
+    for x = 0, 200 do
+      local t = GetTile(x, y)
+      if t and t.fg == platID then
+        return true
+      end
+      opCounter = opCounter + 1
+      if opCounter >= 300 then
+        Sleep(1)
+        opCounter = 0
+      end
+    end
+  end
+  -- if not found, do a wider scan across some typical world rows (fallback)
+  for y = math.max(0, yTop - 10), (yBottom + 10) do
+    for x = 0, 200 do
+      local t = GetTile(x, y)
+      if t and t.fg == platID then
+        return true
+      end
+      opCounter = opCounter + 1
+      if opCounter >= 300 then
+        Sleep(1)
+        opCounter = 0
+      end
+    end
+  end
+  return false
+end
+
 function harvestVertical()
   if not running then
     return
@@ -719,6 +758,10 @@ function harvestVertical()
         punchAbs(x + 10, y)
         Sleep(150)
         punchAbs(x + 15, y)
+        Sleep(150)
+        punchAbs(x + 20, y)
+        Sleep(150)
+        punchAbs(x + 25, y)
         Sleep(delayht)
       end
       y = y + step
@@ -1210,8 +1253,15 @@ RunThread(function()
   while true do
     if reqStartPTHT and not running then
       reqStartPTHT = false
-      running = true
-      StartLoop()
+      -- Before starting, validate that the configured platID exists in the world.
+      -- If not present, do not start and notify the user.
+      if not IsPlatIDPresent() then
+        warn("`4Masukkan Plat ID yang sesuai!")
+        Overlay("`4Masukkan Plat ID yang sesuai!")
+      else
+        running = true
+        StartLoop()
+      end
     end
     if reqBindMAG then
       reqBindMAG = false
